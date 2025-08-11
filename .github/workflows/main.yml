@@ -1,0 +1,48 @@
+name: CI-CD on Github Actions via AWS
+on : 
+  push :
+    branches: ["main"]
+permissions:
+  id-token: write   # for OIDC
+  contents: read
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install test deps (optional, Python example)
+        run: |
+          if [ -f src/requirements.txt ]; then pip3 install -r src/requirements.txt; fi
+          if [ -d tests ] || [ -f pytest.ini ]; then pytest -q; fi
+
+      - name: Create deploy bundle (must have appspec.yml at root)
+        run: |
+          rm -rf bundle artifact.zip
+          mkdir -p bundle
+          cp -r src bundle/src
+          cp -r scripts bundle/scripts
+          cp appspec.yml bundle/
+          (cd bundle && zip -r ../artifact.zip .)
+
+      - name: Upload artifact to S3
+        run: |
+          aws s3 cp artifact.zip s3://${{ secrets.ARTIFACTS_BUCKET }}/github-only/artifact-${{ github.sha }}.zip
+
+      - name: Create CodeDeploy deployment
+        env:
+          CD_APP: ${{ secrets.CD_APP || 'FlaskHelloApp' }}
+          CD_DG:  ${{ secrets.CD_DG  || 'FlaskDeploymentGroup' }}
+        run: |
+          aws deploy create-deployment \
+            --application-name "$CD_APP" \
+            --deployment-group-name "$CD_DG" \
+            --s3-location bucket=${{ secrets.ARTIFACTS_BUCKET }},bundleType=zip,key=github-only/artifact-${{ github.sha }}.zip

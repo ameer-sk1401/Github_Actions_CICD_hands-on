@@ -1,0 +1,17 @@
+version: 0.2
+phases:
+  install:
+    commands:
+    - pip install -r src/requirements.txt
+  build:
+    commands:
+    - rm -rf bundle
+    - mkdir -p bundle
+    - cp -r src bundle/src
+    - cp appspec.yml bundle/
+    - cp -r scripts bundle/scripts
+artifacts:
+  base-directory: bundle
+  files:
+  - '**/*'
+  discard-paths: no

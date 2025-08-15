@@ -40,7 +40,7 @@ jobs:
       - name: Deploy via CodeDeploy
         env:
           CD_APP: ${{ secrets.CD_APP }}
-          CD_DG:  ${{ secrets.CD_DG }}
+          CD_DG:  ${{ secrets.CD_GROUP }}
         run: |
           aws deploy create-deployment \
             --application-name "$CD_APP" \
